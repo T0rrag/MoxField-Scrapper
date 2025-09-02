@@ -1,12 +1,10 @@
 # LIBRARY DIVISION
 import csv
 import time
-import random
 import re
 from urllib.parse import urlparse
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
@@ -131,7 +129,7 @@ try:
                 print("No fallback 'View More' button found. Proceeding to scrape visible decks.")
                 break
 
-    print("Collecting deck links and names...")
+    print("Collecting deck links, names, and colors...")
     try:
         link_elems = driver.find_elements(By.CSS_SELECTOR, "a[href^='/decks/']")
         print(f"Found {len(link_elems)} potential deck links.")
@@ -148,6 +146,10 @@ try:
             parsed = urlparse(href)
             parts = [p for p in parsed.path.split('/') if p]
             if len(parts) >= 2 and parts[0] == "decks" and parts[1] != "public":
+                # Skip invalid deck IDs like "following" or "liked"
+                if parts[1] in ["following", "liked"]:
+                    print(f"Skipping invalid deck ID: {parts[1]}")
+                    continue
                 # Extract deck name from the span with class MKZh9kXyTHLRH7IyZaX8
                 try:
                     name_elem = link.find_element(By.CSS_SELECTOR, "span.MKZh9kXyTHLRH7IyZaX8")
@@ -159,20 +161,32 @@ try:
                     deck_name = parts[1]  # Fallback to URL deck ID
                     print(f"Warning: Could not find deck name for {href}, using ID: {deck_name}")
 
+                # Extract colors from mana spans
+                try:
+                    mana_elems = link.find_elements(By.CSS_SELECTOR, "span.mana[aria-label]")
+                    colors = [mana_elem.get_attribute('aria-label').capitalize() for mana_elem in mana_elems if mana_elem.get_attribute('aria-label')]
+                    colors_str = ",".join(sorted(set(colors)))  # Sort and remove duplicates
+                    print(f"Colors for {deck_name}: {colors_str}")  # Debug log
+                except:
+                    colors_str = ""  # Fallback to empty string if no colors found
+                    print(f"Warning: Could not find colors for {href}, using empty string")
+
                 normalized_url = f"https://moxfield.com/decks/{parts[1]}"
-                deck_data.append((deck_name, normalized_url))
+                deck_data.append((deck_name, normalized_url, colors_str))
                 if i < 5:  # Log first 5 for debugging
-                    print(f"Deck {i+1}: {deck_name} | {normalized_url}")
+                    print(f"Deck {i+1}: {deck_name} | {normalized_url} | {colors_str}")
         except NoSuchWindowException:
             print("Error: Browser window closed while processing deck links.")
             raise
 
     print("Saving deck links to CSV...")
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.writer(f, delimiter=",", quoting=csv.QUOTE_MINIMAL)
-        writer.writerow(["Deck ID", "Deck URL"])  # Headers
-        for deck_name, url in sorted(deck_data, key=lambda x: x[0]):
-            writer.writerow([deck_name, url])
+        writer = csv.writer(f, delimiter=",", quoting=csv.QUOTE_ALL)
+        writer.writerow(["Deck ID", "Deck URL", "Colours"])  # Headers
+        print("Writing CSV rows:")  # Debug: print rows being written
+        for deck_name, url, colors in sorted(deck_data, key=lambda x: x[0]):
+            print(f"  {deck_name},{url},{colors}")  # Debug log
+            writer.writerow([deck_name, url, colors])
 
     print(f"✅ Saved {len(deck_data)} deck links to {OUTPUT_CSV}")
 
