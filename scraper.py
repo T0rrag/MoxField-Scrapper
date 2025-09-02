@@ -168,9 +168,9 @@ try:
             raise
 
     print("Saving deck links to CSV...")
-    with open(OUTPUT_CSV, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f, quoting=csv.QUOTE_NONNUMERIC, delimiter=",")
-        writer.writerow(["deck_id", "url"])  # Headers
+    with open(OUTPUT_CSV, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+        writer.writerow(["Deck ID", "Deck URL"])  # Headers
         for deck_name, url in sorted(deck_data, key=lambda x: x[0]):
             writer.writerow([deck_name, url])
 
