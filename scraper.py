@@ -15,15 +15,13 @@ from selenium.common.exceptions import NoSuchWindowException, WebDriverException
 # DATA DIVISION
 URL = "https://moxfield.com/decks/public?q=eyJmb3JtYXQiOiJjb21tYW5kZXJQcmVjb25zIn0%3D"
 OUTPUT_CSV = "EDH_Precon_list.csv"
-LOAD_MORE_PAUSE = 3  # Increased pause for stability
-MAX_CLICKS = 3  # Limit to 3 clicks as specified
+LOAD_MORE_PAUSE = 3
+MAX_CLICKS = 3
 TIMEOUT = 20
 SCROLL_PAUSE = 1
 
 # START DIVISION
 options = Options()
-# Comment out headless for debugging
-# options.add_argument("--headless")
 options.add_argument("--window-size=1920,1080")
 options.add_argument("--disable-blink-features=AutomationControlled")
 options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36")
@@ -41,7 +39,7 @@ try:
     print("Loading page...")
     try:
         driver.get(URL)
-        time.sleep(10)  # Initial delay for page load
+        time.sleep(10)
     except NoSuchWindowException:
         print("Error: Browser window closed during page load. Retrying...")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -75,9 +73,8 @@ try:
     click_count = 0
     while click_count < MAX_CLICKS:
         try:
-            # Incremental scrolling to ensure "View More" is visible
             last_height = driver.execute_script("return document.body.scrollHeight")
-            for _ in range(5):  # Increased scrolling attempts
+            for _ in range(5):
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(SCROLL_PAUSE)
                 new_height = driver.execute_script("return document.body.scrollHeight")
@@ -85,11 +82,10 @@ try:
                     break
                 last_height = new_height
 
-            # Try to find the "View More" button
+            #Find the "View More" button
             load_more = WebDriverWait(driver, 5).until(
                 EC.element_to_be_clickable((By.XPATH, "//button[.//span[contains(text(), 'View More')]]"))
             )
-            # Log the button's details for debugging
             button_class = load_more.get_attribute('class')
             button_text = load_more.text
             is_displayed = load_more.is_displayed()
@@ -146,34 +142,34 @@ try:
             parsed = urlparse(href)
             parts = [p for p in parsed.path.split('/') if p]
             if len(parts) >= 2 and parts[0] == "decks" and parts[1] != "public":
-                # Skip invalid deck IDs like "following" or "liked"
+                # Skip invalid deck IDs
                 if parts[1] in ["following", "liked"]:
                     print(f"Skipping invalid deck ID: {parts[1]}")
                     continue
                 # Extract deck name from the span with class MKZh9kXyTHLRH7IyZaX8
                 try:
                     name_elem = link.find_element(By.CSS_SELECTOR, "span.MKZh9kXyTHLRH7IyZaX8")
-                    full_name = name_elem.get_attribute('title') or name_elem.text  # Prefer title for full name
-                    # Clean the name: remove parenthetical text, trailing ellipsis, and extra spaces
+                    full_name = name_elem.get_attribute('title') or name_elem.text  #Prefer title for full name
+                    #Remove parenthetical text, trailing ellipsis, and extra spaces
                     deck_name = re.sub(r'\s*\([^)]*\)', '', full_name).replace('...', '').strip()
-                    print(f"Raw deck name: {full_name}, Cleaned: {deck_name}")  # Debug log
+                    print(f"Raw deck name: {full_name}, Cleaned: {deck_name}")
                 except:
-                    deck_name = parts[1]  # Fallback to URL deck ID
+                    deck_name = parts[1]
                     print(f"Warning: Could not find deck name for {href}, using ID: {deck_name}")
 
-                # Extract colors from mana spans
+                # Extract colors
                 try:
                     mana_elems = link.find_elements(By.CSS_SELECTOR, "span.mana[aria-label]")
                     colors = [mana_elem.get_attribute('aria-label').capitalize() for mana_elem in mana_elems if mana_elem.get_attribute('aria-label')]
                     colors_str = ",".join(sorted(set(colors)))  # Sort and remove duplicates
-                    print(f"Colors for {deck_name}: {colors_str}")  # Debug log
+                    print(f"Colors for {deck_name}: {colors_str}")
                 except:
                     colors_str = ""  # Fallback to empty string if no colors found
                     print(f"Warning: Could not find colors for {href}, using empty string")
 
                 normalized_url = f"https://moxfield.com/decks/{parts[1]}"
                 deck_data.append((deck_name, normalized_url, colors_str))
-                if i < 5:  # Log first 5 for debugging
+                if i < 5:
                     print(f"Deck {i+1}: {deck_name} | {normalized_url} | {colors_str}")
         except NoSuchWindowException:
             print("Error: Browser window closed while processing deck links.")
@@ -182,13 +178,13 @@ try:
     print("Saving deck links to CSV...")
     with open(OUTPUT_CSV, "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.writer(f, delimiter=",", quoting=csv.QUOTE_ALL)
-        writer.writerow(["Deck ID", "Deck URL", "Colours"])  # Headers
-        print("Writing CSV rows:")  # Debug: print rows being written
+        writer.writerow(["Deck ID", "Deck URL", "Colours"])
+        print("Writing CSV rows:")
         for deck_name, url, colors in sorted(deck_data, key=lambda x: x[0]):
-            print(f"  {deck_name},{url},{colors}")  # Debug log
+            print(f"  {deck_name},{url},{colors}")
             writer.writerow([deck_name, url, colors])
 
-    print(f"✅ Saved {len(deck_data)} deck links to {OUTPUT_CSV}")
+    print(f"Saved {len(deck_data)} deck links to {OUTPUT_CSV}")
 
 finally:
     print("Closing browser...")
